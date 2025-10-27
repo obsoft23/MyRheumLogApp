@@ -1,0 +1,150 @@
+/*// lib/view/onboarding/onboard.dart
+// MyRheumLog - Onboarding flow
+// Flutter 3.x + Dart 3 + GetX + get_storage
+
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
+
+// =========================== Strings ===========================
+class S {
+  static const appName = 'MyRheumLog';
+  static const back = 'Back';
+  static const next = 'Next';
+  static const skip = 'Skip';
+  static const step1 = 'Profile';
+  static const step2 = 'Rheumatologist';
+  static const step3 = 'Medications';
+}
+
+// =========================== Controller ===========================
+class OnboardingController extends GetxController {
+  final stepIndex = 0.obs;
+
+  void goNext() {
+    if (stepIndex.value < 2) {
+      stepIndex.value++;
+    }
+  }
+
+  void goBack() {
+    if (stepIndex.value > 0) {
+      stepIndex.value--;
+    }
+  }
+
+  void skipCurrent() {
+    if (stepIndex.value < 2) {
+      stepIndex.value++;
+    }
+  }
+}
+
+// =========================== Onboarding Shell ===========================
+class OnboardingShell extends StatelessWidget {
+  const OnboardingShell({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Get.put(OnboardingController());
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(S.appName),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Obx(
+                () => Row(
+                  children: List.generate(3, (i) {
+                    final isActive = i == c.stepIndex.value;
+                    return Expanded(
+                      child: Container(
+                        margin: EdgeInsets.only(right: i < 2 ? 8 : 0),
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: isActive ? Colors.blue : Colors.grey,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: Obx(
+                  () {
+                    switch (c.stepIndex.value) {
+                      case 0:
+                        return const _StepProfile();
+                      case 1:
+                        return const _StepRheumatologist();
+                      case 2:
+                      default:
+                        return const _StepMedications();
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: c.stepIndex.value > 0 ? c.goBack : null,
+                      child: const Text(S.back),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: c.stepIndex.value < 2 ? c.goNext : null,
+                      child: const Text(S.next),
+                    ),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: c.skipCurrent,
+                child: const Text(S.skip),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =========================== Steps ===========================
+class _StepProfile extends StatelessWidget {
+  const _StepProfile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Text(S.step1));
+  }
+}
+
+class _StepRheumatologist extends StatelessWidget {
+  const _StepRheumatologist();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Text(S.step2));
+  }
+}
+
+class _StepMedications extends StatelessWidget {
+  const _StepMedications();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Text(S.step3));
+  }
+}
+*/

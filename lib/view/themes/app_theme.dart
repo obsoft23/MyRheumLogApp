@@ -1,7 +1,7 @@
 // app_theme.dart
 import 'package:flutter/material.dart';
 
-Color primaryBlue = Color(0xFF4A90E2);
+Color primaryBlue = Color(0xFF4A90E2); //echo '#4A90E2'
 Color secondaryGreen = Color(0xFF7ED321);
 Color warningAmber = Color(0xFFF5A623);
 Color alertRed = Color(0xFFD0021B);
@@ -15,6 +15,7 @@ class AppTheme {
     useMaterial3: true,
     brightness: Brightness.light,
     primaryColor: primaryBlue,
+    fontFamily: 'Satoshi',
     scaffoldBackgroundColor: backgroundLight,
     colorScheme: ColorScheme.light(
       primary: primaryBlue,
@@ -44,6 +45,7 @@ class AppTheme {
       filled: true,
       fillColor: Colors.white,
       border: OutlineInputBorder(
+        // ignore: deprecated_member_use
         borderSide: BorderSide(color: primaryBlue.withOpacity(0.4)),
         borderRadius: BorderRadius.all(Radius.circular(12)),
       ),
