@@ -1,118 +1,147 @@
 // lib/view/onboarding/onboard.dart
-// MyRheumLog - Onboarding flow
-// Flutter 3.x + GetX + GetStorage (offline-first)
-// This file contains: routes, bindings, controller, models, widgets, and pages for the onboarding wizard.
-// Each section is commented for clarity.
+// MyRheumLog Onboarding Flow (Flutter 3.x + GetX + GetStorage)
+// -----------------------------------------------------------
+// This file contains a complete, modular onboarding flow with:
+// - GetX Controllers, Bindings, and Routes
+// - Offline persistence via GetStorage (offline-first)
+// - Premium, accessible UI with subtle animations
+// - 3-step onboarding: Diagnosis -> Medications -> Notifications
+//
+// Integration notes:
+// - Register OnboardingRoutes.getPages in your GetMaterialApp routes.
+// - Start with route Routes.onboarding.
+// - Ensure OnboardingBinding is attached to the onboarding route.
+// - Hero(tag: 'app_logo') is used to match the Splashscreen logo if needed.
 
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: unused_local_variable, deprecated_member_use
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:myrheumlogapp/view/homepage/home.dart';
 
-////////////////////////////////////////////////////////////////////////////////
-// Strings (simple i18n extension point)
-////////////////////////////////////////////////////////////////////////////////
+/// Centralized strings for easy i18n later.
 class AppStrings {
-  // App
   static const appName = 'MyRheumLog';
 
-  // Routes
-  static const onboardingTitle = 'Welcome';
-  static const notificationsTitle = 'Notifications';
-  static const homeTitle = 'Home';
-
-  // Stepper
-  static const step1Title = 'Quick Profile';
-  static const step2Title = 'Your Rheumatologist';
-  static const step3Title = 'Medications';
-
-  // Common
+  // Generic
   static const next = 'Next';
   static const back = 'Back';
   static const skip = 'Skip';
-  static const done = 'Done';
-  static const continueLabel = 'Continue';
+  static const finish = 'Finish';
   static const notNow = 'Not now';
   static const enable = 'Enable';
-  static const cancel = 'Cancel';
-  static const save = 'Save';
-  static const add = 'Add';
-  static const remove = 'Remove';
-  static const search = 'Search';
-  static const optional = 'Optional';
+  static const enabled = 'Enabled';
+  static const continueToHome = 'Continue to Home';
 
-  // Step 1 fields
-  static const yourName = 'Your name (optional)';
-  static const dob = 'Date of birth';
-  static const pickDate = 'Pick date';
-  static const diagnosis = 'Diagnosis';
-  static const diagnosisHint =
-      'Choose your diagnosis. You can change this later.';
-  static const dobErrorFuture = 'Date of birth cannot be in the future.';
-  static const dobRequired = 'Please select your date of birth.';
-  static const diagnosisRequired = 'Please select a diagnosis.';
-
-  // Step 2 fields
-  static const doctorName = 'Consultant’s name (optional)';
-  static const hospitalName = 'Hospital/Clinic name';
-  static const clinicHelpline = 'Clinic helpline (optional)';
-  static const nextAppointment = 'Next appointment';
-  static const nextAppointmentHint = 'Today or future date';
-  static const hospitalRequired = 'Hospital/Clinic is required for Next.';
-  static const youCanSkip = 'You can skip this step if you prefer.';
-
-  // Step 3 fields
-  static const medicationsHeader =
+  // Onboarding general
+  static const onboardingTitle = 'Welcome';
+  static const onboardingSubtitle = 'Let’s get you set up';
+  static const step1Title = 'Quick Profile Setup';
+  static const step1Subtitle = 'What is your diagnosis?';
+  static const step2Title = 'Current Medications';
+  static const step2Subtitle =
       'Add what you take regularly—this helps tracking and reminders.';
-  static const noMeds = 'No medications added yet';
+  static const step3Title = 'Notifications';
+  static const step3Subtitle =
+      'Stay on top of your health with timely reminders.';
+
+  // Step 1
+  static const selectDiagnosis = 'Select your condition';
+  static const diagnosisRequired = 'Please select a diagnosis to continue.';
+
+  // Step 2
+  static const noMeds = 'No medications added yet.';
   static const addMedication = '+ Add Medication';
-  static const quickSelect = 'Quick select';
+  static const helperCardMsg =
+      'Add what you take regularly—this helps tracking and reminders.';
+  static const prednisolone = 'Prednisolone';
+  static const prednisoloneToggle = 'Taking Prednisolone';
+  static const predDoseMgLabel = 'Prednisolone dose (mg)';
+  static const invalidDose = 'Enter a valid dose between 1–60 mg.';
+  static const painRelief = 'Pain relief';
+  static const paracetamol = 'Paracetamol';
+  static const ibuprofen = 'Ibuprofen';
+
+  // Bottom Sheet
+  static const addMedTitle = 'Add Medication';
+  static const quickSelect = 'Quick-select';
   static const dmards = 'DMARDs';
   static const biologics = 'Biologics';
-  static const prednisolone = 'Prednisolone';
-  static const predDoseMg = 'Dose (mg)';
-  static const doseHelper = 'Enter a numeric dose (e.g., 10 mg)';
-  static const predDoseInvalid = 'Enter a dose between 0.5 and 100 mg';
-  static const painRelief = 'Pain relief';
-  static const painReliefOther = 'Other (free text)';
-  static const notes = 'Notes';
-  static const startDate = 'Start date';
+  static const configure = 'Configure';
   static const frequency = 'Frequency';
-  static const selectFrequency = 'Select frequency';
+  static const doseMg = 'Dose (mg, optional)';
   static const dayOfWeek = 'Day of week';
-  static const timeOfDay = 'Time of day';
+  static const timeOfDay = 'Time';
+  static const save = 'Save';
+  static const remove = 'Remove';
+  static const cancel = 'Cancel';
+  static const alreadyAddedTapToRemove =
+      'Already added — tap again to remove or use Remove icon.';
+  static const examples =
+      'Defaults reflect common NICE 2024 UK regimens. Adjust as needed.';
 
-  // Notifications screen
-  static const notificationsHeader = 'Stay on track';
-  static const notificationsBody1 =
-      '• Medication reminders\n• Appointment nudges\n• Symptom check-ins';
+  // Step 3
+  static const notifBenefitsTitle = 'Why enable notifications?';
+  static const notifBenefit1 = 'Medication reminders';
+  static const notifBenefit2 = 'Appointment reminders';
+  static const notifBenefit3 = 'Symptom check-ins';
   static const enableNotifications = 'Enable Notifications';
-  static const notNowNotifications = 'Not now';
-  static const notificationsEnabled = 'Notifications enabled';
-  static const notificationsSaved = 'We’ll remind you when it helps.';
+  static const notificationsEnabled = 'Notifications enabled!';
+  static const goHome = 'Go to Home';
 
-  // Home
-  static const homeHello = 'You are all set!';
-
-  // Misc
-  static const other = 'Other';
+  // Accessibility / semantics
+  static const selected = 'Selected';
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Models
-////////////////////////////////////////////////////////////////////////////////
+// Simple routes registry for integration.
+class Routes {
+  static const onboarding = '/onboarding';
+  static const home = '/home';
+}
 
-// Diagnosis options (extendable)
+/// Themed color seed for ColorScheme.
+const _seedColor = Color(0xFF1F7A8C);
+
+/// Optional theme helpers (use in your GetMaterialApp if desired).
+ThemeData buildAppTheme(Brightness brightness) {
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: _seedColor,
+    brightness: brightness,
+  );
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: colorScheme,
+    visualDensity: VisualDensity.adaptivePlatformDensity,
+    scaffoldBackgroundColor: colorScheme.surface,
+    appBarTheme: AppBarTheme(
+      backgroundColor: colorScheme.surface,
+      elevation: 0,
+      foregroundColor: colorScheme.onSurface,
+      centerTitle: false,
+    ),
+    cardTheme: CardThemeData(
+      color: colorScheme.surface,
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+    ),
+  );
+}
+
+/// Diagnosis types supported in onboarding.
 enum DiagnosisType {
-  ra, // Rheumatoid Arthritis (RA)
-  psa, // Psoriatic Arthritis (PsA)
-  as, // Ankylosing Spondylitis (AS)
-  enteropathic, // Enteropathic arthritis
-  jia, // Juvenile Idiopathic Arthritis
-  reactive, // Reactive arthritis
-  sle, // Systemic Lupus Erythematosus (if relevant)
-  other, // Other
+  ra,
+  psa,
+  as,
+  enteropathic,
+  reactive,
+  uia, // Undifferentiated Inflammatory Arthritis
+  other,
 }
 
 extension DiagnosisTypeX on DiagnosisType {
@@ -125,117 +154,1077 @@ extension DiagnosisTypeX on DiagnosisType {
       case DiagnosisType.as:
         return 'Ankylosing Spondylitis (AS)';
       case DiagnosisType.enteropathic:
-        return 'Enteropathic arthritis';
-      case DiagnosisType.jia:
-        return 'Juvenile Idiopathic Arthritis';
+        return 'Enteropathic Arthritis';
       case DiagnosisType.reactive:
-        return 'Reactive arthritis';
-      case DiagnosisType.sle:
-        return 'Systemic Lupus Erythematosus';
+        return 'Reactive Arthritis';
+      case DiagnosisType.uia:
+        return 'Undifferentiated Inflammatory Arthritis';
       case DiagnosisType.other:
         return 'Other';
     }
   }
 
-  Color get colorHint {
-    switch (this) {
-      case DiagnosisType.ra:
-        return const Color(0xFF4CB9AB);
-      case DiagnosisType.psa:
-        return const Color(0xFF7CA8F2);
-      case DiagnosisType.as:
-        return const Color(0xFFF2A97C);
-      case DiagnosisType.enteropathic:
-        return const Color(0xFF9AD0C2);
-      case DiagnosisType.jia:
-        return const Color(0xFFD0A3FF);
-      case DiagnosisType.reactive:
-        return const Color(0xFFFFC75F);
-      case DiagnosisType.sle:
-        return const Color(0xFF6EC1E4);
-      case DiagnosisType.other:
-        return const Color(0xFFB0BEC5);
-    }
+  String get storageKey => toString().split('.').last;
+
+  static DiagnosisType? fromKey(String? key) {
+    if (key == null) return null;
+    return DiagnosisType.values.firstWhereOrNull((e) => e.storageKey == key);
   }
 }
 
-// Medication entry data class
+/// Medication entry model with (de)serialization for GetStorage.
 class MedicationEntry {
   final String name;
-  final double? doseMg; // optional numeric dose (if applicable)
-  final String? notes; // frequency/schedule or free notes
+  final String? notes; // For schedule notes like "Weekly Monday 20:00"
+  final double? doseMg;
+  final String? frequency; // e.g., once daily, twice daily, weekly
 
-  MedicationEntry({required this.name, this.doseMg, this.notes});
+  MedicationEntry({
+    required this.name,
+    this.notes,
+    this.doseMg,
+    this.frequency,
+  });
 
-  MedicationEntry copyWith({String? name, double? doseMg, String? notes}) {
+  MedicationEntry copyWith({
+    String? name,
+    String? notes,
+    double? doseMg,
+    String? frequency,
+  }) {
     return MedicationEntry(
       name: name ?? this.name,
-      doseMg: doseMg ?? this.doseMg,
       notes: notes ?? this.notes,
+      doseMg: doseMg ?? this.doseMg,
+      frequency: frequency ?? this.frequency,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'name': name,
-    'doseMg': doseMg,
     'notes': notes,
+    'doseMg': doseMg,
+    'frequency': frequency,
   };
 
-  factory MedicationEntry.fromJson(Map<String, dynamic> json) =>
-      MedicationEntry(
-        name: json['name'] as String,
-        doseMg: (json['doseMg'] as num?)?.toDouble(),
-        notes: json['notes'] as String?,
-      );
+  static MedicationEntry fromJson(Map<String, dynamic> json) {
+    return MedicationEntry(
+      name: json['name'] as String,
+      notes: json['notes'] as String?,
+      doseMg: json['doseMg'] == null
+          ? null
+          : (json['doseMg'] as num).toDouble(),
+      frequency: json['frequency'] as String?,
+    );
+  }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Controller (GetX) + Persistence
-////////////////////////////////////////////////////////////////////////////////
-
+/// Onboarding controller using GetX and GetStorage.
 class OnboardingController extends GetxController {
-  // Storage
-  static const _boxName = 'myrheumlog';
-  static const _kData = 'onboarding_data';
-  static const _kStep = 'onboarding_step';
-  final GetStorage storage = GetStorage(_boxName);
+  // Storage box (initialized in binding).
+  final GetStorage box;
+
+  OnboardingController(this.box);
 
   // Reactive fields
-  final RxnString name = RxnString();
-  final Rxn<DateTime> dateOfBirth = Rxn<DateTime>();
-  final Rx<DiagnosisType?> diagnosis = Rx<DiagnosisType?>(null);
-
-  final RxnString doctorName = RxnString();
-  final RxnString hospitalName = RxnString();
-  final RxnString clinicHelpline = RxnString();
-  final Rxn<DateTime> nextAppointment = Rxn<DateTime>();
-
+  final Rxn<DiagnosisType> diagnosis = Rxn<DiagnosisType>();
   final RxList<MedicationEntry> medications = <MedicationEntry>[].obs;
-  final RxBool prednisoloneOn = false.obs;
   final RxnDouble prednisoloneDoseMg = RxnDouble();
-  final RxList<String> painRelief = <String>[].obs;
-
   final RxBool notificationsEnabled = false.obs;
 
-  // Step control
-  final RxInt currentStep = 0.obs; // 0..2
+  // Step management
+  final RxInt currentStep = 0.obs;
+  static const int totalSteps = 3;
 
-  // Pain relief suggestions
-  final List<String> _painReliefOptions = const [
-    'Paracetamol',
-    'Ibuprofen',
-    'Naproxen',
-    'Codeine',
+  // Keys for persistence
+  static const _kDiagnosis = 'diagnosis';
+  static const _kMedications = 'medications';
+  static const _kPredDose = 'prednisoloneDoseMg';
+  static const _kNotifications = 'notificationsEnabled';
+  static const _kStep = 'onboardingStep';
+
+  // Derived
+  bool get isPrednisoloneOn => (prednisoloneDoseMg.value != null);
+
+  // Frequencies for UI
+  final List<String> frequencyOptions = const <String>[
+    'Once daily',
+    'Twice daily',
+    'Three times daily (TDS)',
+    'Four times daily (QDS)',
+    'Weekly',
+    'Fortnightly',
+    'Monthly',
+    'PRN (as needed)',
   ];
-  List<String> get painReliefOptions => _painReliefOptions;
 
-  // DMARD & Biologics (extendable)
-  final List<String> quickMeds = const [
+  @override
+  void onInit() {
+    super.onInit();
+    _restore();
+    // Persist whenever data changes.
+    ever<DiagnosisType?>(diagnosis, (_) => _persistDiagnosis());
+    ever<List<MedicationEntry>>(medications, (_) => _persistMedications());
+    ever<double?>(prednisoloneDoseMg, (_) => _persistPrednisolone());
+    ever<bool>(notificationsEnabled, (_) => _persistNotifications());
+    ever<int>(currentStep, (_) => _persistStep());
+  }
+
+  // RESTORE STATE FROM STORAGE
+  void _restore() {
+    // Diagnosis
+    final diagKey = box.read<String?>(_kDiagnosis);
+    diagnosis.value = DiagnosisTypeX.fromKey(diagKey);
+
+    // Medications
+    final medsRaw = box.read<List<dynamic>>(_kMedications) ?? [];
+    final meds = medsRaw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .map(MedicationEntry.fromJson)
+        .toList();
+    medications.assignAll(meds);
+
+    // Prednisolone dose
+    final pred = box.read<dynamic>(_kPredDose);
+    if (pred is num) {
+      prednisoloneDoseMg.value = pred.toDouble();
+    } else {
+      prednisoloneDoseMg.value = null;
+    }
+
+    // Notifications
+    notificationsEnabled.value = box.read<bool>(_kNotifications) ?? false;
+
+    // Step
+    final step = box.read<int>(_kStep) ?? 0;
+    currentStep.value = step.clamp(0, totalSteps - 1);
+  }
+
+  // PERSIST HELPERS
+  Future<void> _persistDiagnosis() async {
+    await box.write(_kDiagnosis, diagnosis.value?.storageKey);
+  }
+
+  Future<void> _persistMedications() async {
+    await box.write(_kMedications, medications.map((e) => e.toJson()).toList());
+  }
+
+  Future<void> _persistPrednisolone() async {
+    final val = prednisoloneDoseMg.value;
+    if (val == null) {
+      await box.remove(_kPredDose);
+    } else {
+      await box.write(_kPredDose, val);
+    }
+  }
+
+  Future<void> _persistNotifications() async {
+    await box.write(_kNotifications, notificationsEnabled.value);
+  }
+
+  Future<void> _persistStep() async {
+    await box.write(_kStep, currentStep.value);
+  }
+
+  // STEP NAVIGATION
+  bool get canGoBack => currentStep.value > 0;
+  bool get isLastStep => currentStep.value == totalSteps - 1;
+
+  bool get canGoNext {
+    if (currentStep.value == 0) {
+      return diagnosis.value != null;
+    }
+    // Step 2 has no required fields
+    // Step 3 can always finish
+    return true;
+  }
+
+  void nextStep() {
+    if (!canGoNext) return;
+    if (!isLastStep) {
+      currentStep.value++;
+    }
+  }
+
+  void backStep() {
+    if (!canGoBack) return;
+    currentStep.value--;
+  }
+
+  // DIAGNOSIS
+  void setDiagnosis(DiagnosisType d) {
+    diagnosis.value = d;
+  }
+
+  // MEDICATIONS
+  bool hasMedication(String name) => medications.any((m) => m.name == name);
+
+  void addOrUpdateMedication(MedicationEntry entry) {
+    final idx = medications.indexWhere((m) => m.name == entry.name);
+    if (idx >= 0) {
+      medications[idx] = entry;
+      medications.refresh();
+    } else {
+      medications.add(entry);
+    }
+  }
+
+  void removeMedicationByName(String name) {
+    medications.removeWhere((m) => m.name == name);
+  }
+
+  // Prednisolone toggle
+  void setPrednisoloneOn(bool on) {
+    if (!on) prednisoloneDoseMg.value = null;
+    if (on && prednisoloneDoseMg.value == null) {
+      prednisoloneDoseMg.value = 5; // sensible default
+    }
+  }
+
+  void setPrednisoloneDose(double? mg) {
+    prednisoloneDoseMg.value = mg;
+  }
+}
+
+/// Binding initializes GetStorage and provides the controller.
+class OnboardingBinding extends Bindings {
+  @override
+  void dependencies() {
+    Get.putAsync<OnboardingController>(() async {
+      // Dedicated box for onboarding.
+      await GetStorage.init('onboarding');
+      final box = GetStorage('onboarding');
+      return OnboardingController(box);
+    });
+  }
+}
+
+/// Route configuration helper (optional).
+class OnboardingRoutes {
+  static List<GetPage> getPages() => [
+    GetPage(
+      name: Routes.onboarding,
+      page: () => const OnboardingShell(),
+      binding: OnboardingBinding(),
+      transition: Transition.cupertinoDialog,
+      transitionDuration: const Duration(milliseconds: 220),
+    ),
+    GetPage(
+      name: Routes.home,
+      page: () => const OnboardingCompletePlaceholder(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: const Duration(milliseconds: 240),
+    ),
+  ];
+}
+
+/// Onboarding shell with stepper, animated body, and navigation.
+class OnboardingShell extends GetView<OnboardingController> {
+  const OnboardingShell({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Hero(
+              tag: 'app_logo',
+              child: CircleAvatar(
+                backgroundColor: cs.primary,
+                radius: 18,
+                child: const Icon(Icons.favorite, color: Colors.white),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(AppStrings.appName),
+          ],
+        ),
+        centerTitle: false,
+      ),
+      body: SafeArea(
+        child: Obx(
+          () => Column(
+            children: [
+              _AnimatedStepper(
+                current: controller.currentStep.value,
+                total: OnboardingController.totalSteps,
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (child, anim) => SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.08, 0),
+                      end: Offset.zero,
+                    ).animate(anim),
+                    child: FadeTransition(opacity: anim, child: child),
+                  ),
+                  child: _buildStep(controller.currentStep.value),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _BottomNavBar(
+                onBack: controller.canGoBack ? controller.backStep : null,
+                onNext: controller.canGoNext
+                    ? () {
+                        if (controller.isLastStep) {
+                          // Finish -> go Home
+                          Get.offAll(() => HomePage());
+                        } else {
+                          controller.nextStep();
+                        }
+                      }
+                    : null,
+                onSkip: () {
+                  if (controller.currentStep.value == 1) {
+                    controller.nextStep();
+                  } else if (controller.currentStep.value == 2) {
+                    Get.offAllNamed(Routes.home);
+                  }
+                },
+                isLast: controller.isLastStep,
+                canBack: controller.canGoBack,
+                canNext: controller.canGoNext,
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep(int step) {
+    switch (step) {
+      case 0:
+        return const _StepDiagnosis();
+      case 1:
+        return const _StepMedications();
+      case 2:
+        return const _StepNotifications();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+}
+
+/// Top animated stepper/progress indicator.
+class _AnimatedStepper extends StatelessWidget {
+  final int current;
+  final int total;
+  const _AnimatedStepper({required this.current, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SizedBox(
+        height: 8,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            final segmentW = w / total;
+            return Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                  width: (current + 1) * segmentW,
+                  decoration: BoxDecoration(
+                    color: cs.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom navigation area with Back / Skip / Next buttons.
+class _BottomNavBar extends StatelessWidget {
+  final VoidCallback? onBack;
+  final VoidCallback? onNext;
+  final VoidCallback? onSkip;
+  final bool isLast;
+  final bool canBack;
+  final bool canNext;
+
+  const _BottomNavBar({
+    required this.onBack,
+    required this.onNext,
+    required this.onSkip,
+    required this.isLast,
+    required this.canBack,
+    required this.canNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: canBack ? onBack : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.surfaceContainerHighest,
+                foregroundColor: cs.onSurfaceVariant,
+                minimumSize: const Size(44, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(AppStrings.back),
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (!isLast)
+            Expanded(
+              child: OutlinedButton(
+                onPressed: onSkip,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(44, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(AppStrings.skip),
+              ),
+            ),
+          if (!isLast) const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton(
+              onPressed: canNext ? onNext : null,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(44, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: Text(isLast ? AppStrings.finish : AppStrings.next),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// -----------------------------
+// STEP 1: DIAGNOSIS SELECTION
+// -----------------------------
+class _StepDiagnosis extends GetView<OnboardingController> {
+  const _StepDiagnosis();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final headline = Theme.of(
+      context,
+    ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600);
+    return Padding(
+      key: const ValueKey('step1'),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(AppStrings.step1Title, style: headline),
+          const SizedBox(height: 4),
+          Text(
+            AppStrings.step1Subtitle,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Obx(() {
+              final selected = controller.diagnosis.value;
+              final items = DiagnosisType.values;
+              return GridView.builder(
+                physics: const BouncingScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.35,
+                ),
+                itemCount: items.length,
+                itemBuilder: (context, i) {
+                  final d = items[i];
+                  final isSelected = selected == d;
+                  return _DiagnosisTile(
+                    type: d,
+                    selected: isSelected,
+                    onTap: () => controller.setDiagnosis(d),
+                    color: _diagnosisColor(cs, d),
+                  );
+                },
+              );
+            }),
+          ),
+          Obx(() {
+            if (controller.diagnosis.value != null) return const SizedBox();
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, size: 18, color: cs.error),
+                  const SizedBox(width: 6),
+                  Text(
+                    AppStrings.diagnosisRequired,
+                    style: TextStyle(color: cs.error),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Color _diagnosisColor(ColorScheme cs, DiagnosisType d) {
+    switch (d) {
+      case DiagnosisType.ra:
+        return cs.primaryContainer;
+      case DiagnosisType.psa:
+        return cs.tertiaryContainer;
+      case DiagnosisType.as:
+        return cs.secondaryContainer;
+      case DiagnosisType.enteropathic:
+        return cs.surfaceContainerHighest;
+      case DiagnosisType.reactive:
+        return cs.primary.withOpacity(0.15);
+      case DiagnosisType.uia:
+        return cs.tertiary.withOpacity(0.15);
+      case DiagnosisType.other:
+        return cs.secondary.withOpacity(0.15);
+    }
+  }
+}
+
+class _DiagnosisTile extends StatefulWidget {
+  final DiagnosisType type;
+  final VoidCallback onTap;
+  final bool selected;
+  final Color color;
+  const _DiagnosisTile({
+    required this.type,
+    required this.onTap,
+    required this.selected,
+    required this.color,
+  });
+
+  @override
+  State<_DiagnosisTile> createState() => _DiagnosisTileState();
+}
+
+class _DiagnosisTileState extends State<_DiagnosisTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressCtrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      lowerBound: 0.0,
+      upperBound: 0.06,
+    );
+    _scale = Tween<double>(
+      begin: 1,
+      end: 0.94,
+    ).animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _pressCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final onBg =
+        ThemeData.estimateBrightnessForColor(widget.color) == Brightness.dark
+        ? Colors.white
+        : Colors.black87;
+
+    return Semantics(
+      button: true,
+      selected: widget.selected,
+      label:
+          '${widget.type.label}${widget.selected ? ', ${AppStrings.selected}' : ''}',
+      child: GestureDetector(
+        onTapDown: (_) => _pressCtrl.forward(),
+        onTapCancel: () => _pressCtrl.reverse(),
+        onTapUp: (_) => _pressCtrl.reverse(),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: widget.selected ? 0.98 : 1.0,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: widget.color,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                if (widget.selected)
+                  BoxShadow(
+                    color: cs.primary.withOpacity(0.15),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+              ],
+              border: Border.all(
+                color: widget.selected ? cs.primary : Colors.transparent,
+                width: 2,
+              ),
+            ),
+            child: ScaleTransition(
+              scale: _scale,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  widget.type.label,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: onBg,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// -----------------------------
+// STEP 2: MEDICATIONS
+// -----------------------------
+class _StepMedications extends GetView<OnboardingController> {
+  const _StepMedications();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final headline = Theme.of(
+      context,
+    ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600);
+
+    return Scaffold(
+      key: const ValueKey('step2'),
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openAddMedicationSheet(context),
+        icon: const Icon(Icons.add),
+        label: const Text(AppStrings.addMedication),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(AppStrings.step2Title, style: headline),
+            const SizedBox(height: 4),
+            _HelperCard(text: AppStrings.helperCardMsg),
+            const SizedBox(height: 12),
+            _PrednisoloneSection(),
+            const SizedBox(height: 16),
+            Expanded(
+              child: Obx(() {
+                final meds = controller.medications.toList(growable: false);
+                if (meds.isEmpty) {
+                  return _EmptyMedsPlaceholder();
+                }
+                return ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: meds.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    final m = meds[i];
+                    return _MedicationTile(
+                      entry: m,
+                      onRemove: () => controller.removeMedicationByName(m.name),
+                    );
+                  },
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+            _PainReliefQuickAdd(),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openAddMedicationSheet(BuildContext context) {
+    Get.bottomSheet(
+      isScrollControlled: true,
+      _AddMedicationSheet(),
+      enterBottomSheetDuration: const Duration(milliseconds: 220),
+      exitBottomSheetDuration: const Duration(milliseconds: 200),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+    );
+  }
+}
+
+class _HelperCard extends StatelessWidget {
+  final String text;
+  const _HelperCard({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 1.5,
+      color: cs.primaryContainer.withOpacity(0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.info, color: cs.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                text,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyMedsPlaceholder extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Opacity(
+        opacity: 0.8,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.medication_liquid, size: 64, color: cs.outline),
+            const SizedBox(height: 12),
+            Text(
+              AppStrings.noMeds,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: cs.outline),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MedicationTile extends StatelessWidget {
+  final MedicationEntry entry;
+  final VoidCallback onRemove;
+  const _MedicationTile({required this.entry, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: cs.primary.withOpacity(0.15),
+          child: Icon(Icons.medication, color: cs.primary),
+        ),
+        title: Text(
+          entry.name,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          [
+            if (entry.frequency != null) entry.frequency!,
+            if (entry.doseMg != null) '${entry.doseMg!.toStringAsFixed(0)} mg',
+            if (entry.notes != null) entry.notes!,
+          ].join(' • '),
+        ),
+        trailing: IconButton(
+          tooltip: AppStrings.remove,
+          icon: Icon(Icons.close, color: cs.error),
+          onPressed: onRemove,
+        ),
+      ),
+    );
+  }
+}
+
+class _PrednisoloneSection extends GetView<OnboardingController> {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Obx(() {
+      final on = controller.isPrednisoloneOn;
+      final dose = controller.prednisoloneDoseMg.value;
+      final controllerText = TextEditingController(
+        text: dose?.toStringAsFixed((dose % 1 == 0 ? 0 : 1)) ?? '',
+      );
+      return Card(
+        elevation: 1,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Column(
+            children: [
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: on,
+                onChanged: controller.setPrednisoloneOn,
+                title: const Text(AppStrings.prednisoloneToggle),
+                secondary: Icon(Icons.local_pharmacy, color: cs.primary),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                child: on
+                    ? Column(
+                        key: const ValueKey('pred_on'),
+                        children: [
+                          const SizedBox(height: 8),
+                          TextField(
+                            key: const ValueKey('pred_input'),
+                            controller: controllerText,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: false,
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: AppStrings.predDoseMgLabel,
+                              hintText: 'e.g., 5',
+                            ),
+                            onChanged: (val) {
+                              final parsed = double.tryParse(val);
+                              controller.setPrednisoloneDose(parsed);
+                            },
+                          ),
+                          const SizedBox(height: 6),
+                          Builder(
+                            builder: (context) {
+                              final valid =
+                                  dose != null && dose >= 1 && dose <= 60;
+                              if (valid) {
+                                return const SizedBox.shrink();
+                              }
+                              return Row(
+                                children: [
+                                  Icon(
+                                    Icons.error_outline,
+                                    size: 18,
+                                    color: cs.error,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    AppStrings.invalidDose,
+                                    style: TextStyle(color: cs.error),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                      )
+                    : const SizedBox(height: 0),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class _PainReliefQuickAdd extends GetView<OnboardingController> {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AppStrings.painRelief,
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _ToggleChip(
+              label: AppStrings.paracetamol,
+              selected: controller.hasMedication(AppStrings.paracetamol),
+              onTap: () {
+                final name = AppStrings.paracetamol;
+                if (controller.hasMedication(name)) {
+                  controller.removeMedicationByName(name);
+                } else {
+                  controller.addOrUpdateMedication(
+                    MedicationEntry(
+                      name: name,
+                      frequency: 'PRN (as needed)',
+                      notes: 'Max 1g up to 4x/day as advised',
+                    ),
+                  );
+                }
+              },
+            ),
+            _ToggleChip(
+              label: AppStrings.ibuprofen,
+              selected: controller.hasMedication(AppStrings.ibuprofen),
+              onTap: () {
+                final name = AppStrings.ibuprofen;
+                if (controller.hasMedication(name)) {
+                  controller.removeMedicationByName(name);
+                } else {
+                  controller.addOrUpdateMedication(
+                    MedicationEntry(
+                      name: name,
+                      frequency: 'PRN (as needed)',
+                      notes: 'Take with food; as advised',
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ToggleChip extends StatefulWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ToggleChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  State<_ToggleChip> createState() => _ToggleChipState();
+}
+
+class _ToggleChipState extends State<_ToggleChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      lowerBound: 0.95,
+      upperBound: 1.0,
+      value: 1.0,
+    );
+    _scale = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ToggleChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _ctrl.forward(from: 0.95);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ScaleTransition(
+      scale: _scale,
+      child: ChoiceChip(
+        label: Text(widget.label),
+        selected: widget.selected,
+        onSelected: (_) => widget.onTap(),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        labelStyle: TextStyle(
+          color: widget.selected ? cs.onPrimary : cs.onSurface,
+          fontWeight: FontWeight.w600,
+        ),
+        selectedColor: cs.primary,
+        backgroundColor: cs.surfaceVariant,
+        materialTapTargetSize: MaterialTapTargetSize.padded,
+      ),
+    );
+  }
+}
+
+/// Bottom Sheet for adding medications (chips + expandable sections).
+class _AddMedicationSheet extends StatefulWidget {
+  @override
+  State<_AddMedicationSheet> createState() => _AddMedicationSheetState();
+}
+
+class _AddMedicationSheetState extends State<_AddMedicationSheet> {
+  final TextEditingController _search = TextEditingController();
+  String _query = '';
+
+  // Quick chips
+  final List<String> quick = const [
     'Methotrexate',
     'Sulfasalazine',
     'Hydroxychloroquine',
   ];
-  final List<String> dmardsList = const [
+
+  // DMARDs and Biologics
+  final List<String> dmards = const [
     'Methotrexate',
     'Sulfasalazine',
     'Hydroxychloroquine',
@@ -244,7 +1233,8 @@ class OnboardingController extends GetxController {
     'Ciclosporin',
     'Mycophenolate',
   ];
-  final List<String> biologicsList = const [
+
+  final List<String> biologics = const [
     'Adalimumab',
     'Etanercept',
     'Infliximab',
@@ -258,361 +1248,691 @@ class OnboardingController extends GetxController {
     'Ixekizumab',
   ];
 
-  // Init: load persisted state and determine step
   @override
-  void onInit() {
-    super.onInit();
-    _loadFromStorage();
+  void initState() {
+    super.initState();
+    _search.addListener(() {
+      setState(() {
+        _query = _search.text.toLowerCase();
+      });
+    });
   }
 
-  // Validation
-  bool get isDobValid =>
-      dateOfBirth.value != null && !dateOfBirth.value!.isAfter(DateTime.now());
-  bool get isDiagnosisValid => diagnosis.value != null;
-
-  bool get step1Valid => isDobValid && isDiagnosisValid;
-
-  bool get step2CanNext => (hospitalName.value?.trim().isNotEmpty ?? false);
-  bool get step2CanSkip => true;
-
-  bool get predDoseValid {
-    if (!prednisoloneOn.value) return true;
-    final d = prednisoloneDoseMg.value;
-    if (d == null) return false;
-    return d >= 0.5 && d <= 100;
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
-  bool get step3Valid => predDoseValid;
+  @override
+  Widget build(BuildContext context) {
+    final controller = Get.find<OnboardingController>();
+    final cs = Theme.of(context).colorScheme;
 
-  // Add/remove medications; avoid duplicates by name (case-insensitive)
-  void addOrUpdateMedication(MedicationEntry entry) {
-    final idx = medications.indexWhere(
-      (e) => e.name.toLowerCase().trim() == entry.name.toLowerCase().trim(),
+    final filteredQuick = quick
+        .where((e) => e.toLowerCase().contains(_query))
+        .toList();
+    final filteredDmards = dmards
+        .where((e) => e.toLowerCase().contains(_query))
+        .toList();
+    final filteredBiologics = biologics
+        .where((e) => e.toLowerCase().contains(_query))
+        .toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.8,
+      minChildSize: 0.45,
+      maxChildSize: 0.96,
+      expand: false,
+      builder: (context, scroll) {
+        return Material(
+          color: Theme.of(context).colorScheme.surface,
+          child: SingleChildScrollView(
+            controller: scroll,
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: cs.outline.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    AppStrings.addMedTitle,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    AppStrings.examples,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: cs.outline),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _search,
+                    decoration: InputDecoration(
+                      hintText: 'Search medications',
+                      prefixIcon: const Icon(Icons.search),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (filteredQuick.isNotEmpty) ...[
+                    Text(
+                      AppStrings.quickSelect,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: filteredQuick
+                          .map(
+                            (m) => _SheetChip(
+                              label: m,
+                              selected: controller.hasMedication(m),
+                              onTap: () => _onMedicationChipTap(context, m),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  ExpansionTile(
+                    initiallyExpanded: true,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    title: Text(
+                      AppStrings.dmards,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    children: [
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: filteredDmards
+                            .map(
+                              (m) => _SheetChip(
+                                label: m,
+                                selected: controller.hasMedication(m),
+                                onTap: () => _onMedicationChipTap(context, m),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ExpansionTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    title: Text(
+                      AppStrings.biologics,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    children: [
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: filteredBiologics
+                            .map(
+                              (m) => _SheetChip(
+                                label: m,
+                                selected: controller.hasMedication(m),
+                                onTap: () => _onMedicationChipTap(context, m),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Get.back(),
+                      child: const Text(AppStrings.cancel),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
-    if (idx >= 0) {
-      medications[idx] = entry;
-    } else {
-      medications.add(entry);
-    }
   }
 
-  void removeMedicationByName(String name) {
-    medications.removeWhere(
-      (e) => e.name.toLowerCase().trim() == name.toLowerCase().trim(),
+  void _onMedicationChipTap(BuildContext context, String name) async {
+    final controller = Get.find<OnboardingController>();
+    // Toggle off if exists, otherwise configure.
+    if (controller.hasMedication(name)) {
+      controller.removeMedicationByName(name);
+      return;
+    }
+    // Open config bottom sheet for details.
+    final configured = await Get.bottomSheet<MedicationEntry>(
+      _MedicationConfigSheet(medName: name),
+      isScrollControlled: true,
+      enterBottomSheetDuration: const Duration(milliseconds: 200),
+      exitBottomSheetDuration: const Duration(milliseconds: 200),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
     );
-  }
-
-  bool hasMedication(String name) {
-    return medications.indexWhere(
-          (e) => e.name.toLowerCase().trim() == name.toLowerCase().trim(),
-        ) >=
-        0;
-  }
-
-  // Pain relief toggle
-  void togglePainRelief(String item) {
-    if (painRelief.contains(item)) {
-      painRelief.remove(item);
-    } else {
-      painRelief.add(item);
+    if (configured != null) {
+      controller.addOrUpdateMedication(configured);
     }
   }
-
-  // Step navigation with persistence
-  Future<void> goNext() async {
-    if (currentStep.value < 2) {
-      await persist();
-      currentStep.value += 1;
-      await storage.write(_kStep, currentStep.value);
-    } else {
-      // From Step 3 → Notifications page
-      await persist();
-      Get.toNamed(OnboardingRoutes.notifications);
-    }
-  }
-
-  Future<void> goBack() async {
-    if (currentStep.value > 0) {
-      currentStep.value -= 1;
-      await storage.write(_kStep, currentStep.value);
-    }
-  }
-
-  Future<void> skipStep() async {
-    // Persist what we have and move forward
-    await persist();
-    await goNext();
-  }
-
-  // Persist entire state
-  Future<void> persist() async {
-    await storage.write(_kData, toJson());
-    await storage.write(_kStep, currentStep.value);
-  }
-
-  // Load state
-  void _loadFromStorage() {
-    try {
-      final json = storage.read<Map>(_kData);
-      if (json != null) {
-        name.value = json['name'] as String?;
-        final dobStr = json['dateOfBirth'] as String?;
-        dateOfBirth.value = dobStr != null ? DateTime.tryParse(dobStr) : null;
-
-        final diagStr = json['diagnosis'] as String?;
-        diagnosis.value = diagStr != null
-            ? DiagnosisType.values.firstWhereOrNull((d) => d.name == diagStr)
-            : null;
-
-        doctorName.value = json['doctorName'] as String?;
-        hospitalName.value = json['hospitalName'] as String?;
-        clinicHelpline.value = json['clinicHelpline'] as String?;
-        final apptStr = json['nextAppointment'] as String?;
-        nextAppointment.value = apptStr != null
-            ? DateTime.tryParse(apptStr)
-            : null;
-
-        final medsList =
-            (json['medications'] as List?)
-                ?.cast<Map>()
-                .map((m) => MedicationEntry.fromJson(m.cast<String, dynamic>()))
-                .toList() ??
-            [];
-        medications.assignAll(medsList);
-
-        prednisoloneOn.value = (json['predOn'] as bool?) ?? false;
-        prednisoloneDoseMg.value = (json['predDoseMg'] as num?)?.toDouble();
-
-        final pains = (json['painRelief'] as List?)?.cast<String>() ?? [];
-        painRelief.assignAll(pains);
-
-        notificationsEnabled.value =
-            (json['notificationsEnabled'] as bool?) ?? false;
-      }
-      final step = storage.read<int>(_kStep);
-      if (step != null) {
-        currentStep.value = step.clamp(0, 2);
-      } else {
-        // Compute step if not present
-        currentStep.value = _computeResumeStep();
-      }
-    } catch (_) {
-      // Ignore malformed storage; start fresh
-      currentStep.value = 0;
-    }
-  }
-
-  int _computeResumeStep() {
-    if (!step1Valid) return 0;
-    if (!step2CanNext) return 1;
-    return 2;
-  }
-
-  // Serialize state
-  Map<String, dynamic> toJson() => {
-    'name': name.value,
-    'dateOfBirth': dateOfBirth.value?.toIso8601String(),
-    'diagnosis': diagnosis.value?.name,
-    'doctorName': doctorName.value,
-    'hospitalName': hospitalName.value,
-    'clinicHelpline': clinicHelpline.value,
-    'nextAppointment': nextAppointment.value?.toIso8601String(),
-    'medications': medications.map((m) => m.toJson()).toList(),
-    'predOn': prednisoloneOn.value,
-    'predDoseMg': prednisoloneDoseMg.value,
-    'painRelief': painRelief.toList(),
-    'notificationsEnabled': notificationsEnabled.value,
-  };
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Bindings
-////////////////////////////////////////////////////////////////////////////////
+class _SheetChip extends StatefulWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _SheetChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
-class OnboardingBinding extends Bindings {
   @override
-  void dependencies() {
-    Get.lazyPut<OnboardingController>(
-      () => OnboardingController(),
-      fenix: true,
-    );
-  }
+  State<_SheetChip> createState() => _SheetChipState();
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Routes with custom transitions
-////////////////////////////////////////////////////////////////////////////////
-
-class SlideFadeTransition extends CustomTransition {
-  final Duration duration;
-  SlideFadeTransition({this.duration = const Duration(milliseconds: 220)});
+class _SheetChipState extends State<_SheetChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
   @override
-  Widget buildTransition(
-    BuildContext context,
-    Curve? curve,
-    Alignment? alignment,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) {
-    final offsetTween = Tween<Offset>(
-      begin: const Offset(0.08, 0.0),
-      end: Offset.zero,
-    ).chain(CurveTween(curve: Curves.easeOutCubic));
-    final fadeTween = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).chain(CurveTween(curve: Curves.easeOut));
-    return FadeTransition(
-      opacity: animation.drive(fadeTween),
-      child: SlideTransition(
-        position: animation.drive(offsetTween),
-        child: child,
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 160),
+      lowerBound: 0.95,
+      upperBound: 1.0,
+      value: 1.0,
+    );
+    _scale = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+  }
+
+  @override
+  void didUpdateWidget(covariant _SheetChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _ctrl.forward(from: 0.95);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ScaleTransition(
+      scale: _scale,
+      child: FilterChip(
+        label: Text(widget.label),
+        selected: widget.selected,
+        onSelected: (_) => widget.onTap(),
+        selectedColor: cs.primaryContainer,
+        showCheckmark: true,
+        materialTapTargetSize: MaterialTapTargetSize.padded,
       ),
     );
   }
 }
 
-class OnboardingRoutes {
-  static const onboarding = '/onboarding';
-  static const notifications = '/onboarding/notifications';
-  static const home = '/home';
+/// Bottom sheet to configure a medication entry after selecting it.
+class _MedicationConfigSheet extends StatefulWidget {
+  final String medName;
+  const _MedicationConfigSheet({required this.medName});
 
-  static List<GetPage> pages = [
-    GetPage(
-      name: onboarding,
-      page: () => const OnboardingShellPage(),
-      binding: OnboardingBinding(),
-      customTransition: SlideFadeTransition(),
-      transitionDuration: const Duration(milliseconds: 220),
-    ),
-    GetPage(
-      name: notifications,
-      page: () => const NotificationsSetupPage(),
-      binding: OnboardingBinding(),
-      customTransition: SlideFadeTransition(),
-      transitionDuration: const Duration(milliseconds: 220),
-    ),
-    GetPage(
-      name: home,
-      page: () => const HomePage(),
-      customTransition: SlideFadeTransition(),
-      transitionDuration: const Duration(milliseconds: 220),
-    ),
+  @override
+  State<_MedicationConfigSheet> createState() => _MedicationConfigSheetState();
+}
+
+class _MedicationConfigSheetState extends State<_MedicationConfigSheet> {
+  final _doseCtrl = TextEditingController();
+  String _frequency = 'Once daily';
+  DayOfWeek _dayOfWeek = DayOfWeek.monday;
+  TimeOfDay? _time;
+
+  @override
+  void initState() {
+    super.initState();
+    // Defaults (inspired by common NICE 2024 regimens; user can edit)
+    final defaults = _MedDefaults.forName(widget.medName);
+    _frequency = defaults.frequency;
+    if (defaults.defaultDoseMg != null) {
+      _doseCtrl.text = defaults.defaultDoseMg!.toStringAsFixed(
+        defaults.defaultDoseMg! % 1 == 0 ? 0 : 1,
+      );
+    }
+    if (defaults.frequency.toLowerCase() == 'weekly') {
+      _time = const TimeOfDay(hour: 20, minute: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _doseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isWeekly = _frequency.toLowerCase() == 'weekly';
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.45,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scroll) {
+        return Material(
+          color: Theme.of(context).colorScheme.surface,
+          child: SingleChildScrollView(
+            controller: scroll,
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: cs.outline.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(Icons.medication, color: cs.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${AppStrings.configure}: ${widget.medName}',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _doseCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: false,
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: AppStrings.doseMg,
+                      hintText: 'e.g., 15',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _frequency,
+                    items: _frequencyOptions
+                        .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val == null) return;
+                      setState(() => _frequency = val);
+                    },
+                    decoration: const InputDecoration(
+                      labelText: AppStrings.frequency,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AnimatedOpacity(
+                    opacity: isWeekly ? 1 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: IgnorePointer(
+                      ignoring: !isWeekly,
+                      child: Column(
+                        children: [
+                          DropdownButtonFormField<DayOfWeek>(
+                            value: _dayOfWeek,
+                            items: DayOfWeek.values
+                                .map(
+                                  (d) => DropdownMenuItem(
+                                    value: d,
+                                    child: Text(d.label),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) {
+                              if (val == null) return;
+                              setState(() => _dayOfWeek = val);
+                            },
+                            decoration: const InputDecoration(
+                              labelText: AppStrings.dayOfWeek,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _TimePickerField(
+                            label: AppStrings.timeOfDay,
+                            time: _time,
+                            onPick: () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime:
+                                    _time ??
+                                    const TimeOfDay(hour: 20, minute: 0),
+                              );
+                              if (picked != null) {
+                                setState(() => _time = picked);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Get.back(),
+                          child: const Text(AppStrings.cancel),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            final dose = double.tryParse(_doseCtrl.text);
+                            final notes = isWeekly
+                                ? 'Weekly on ${_dayOfWeek.label}'
+                                      '${_time != null ? ' at ${_time!.format(context)}' : ''}'
+                                : null;
+                            final entry = MedicationEntry(
+                              name: widget.medName,
+                              doseMg: dose,
+                              frequency: _frequency,
+                              notes: notes,
+                            );
+                            Get.back(result: entry);
+                          },
+                          child: const Text(AppStrings.save),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<String> get _frequencyOptions => const [
+    'Once daily',
+    'Twice daily',
+    'Three times daily (TDS)',
+    'Four times daily (QDS)',
+    'Weekly',
+    'Fortnightly',
+    'Monthly',
+    'PRN (as needed)',
   ];
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Reusable UI Widgets (premium, accessible, animated)
-////////////////////////////////////////////////////////////////////////////////
+/// Simple common defaults for certain medications.
+class _MedDefaults {
+  final String name;
+  final String frequency;
+  final double? defaultDoseMg;
 
-// Section card with rounded corners and soft elevation
-class SectionCard extends StatelessWidget {
-  final String? title;
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final EdgeInsetsGeometry margin;
+  _MedDefaults(this.name, this.frequency, this.defaultDoseMg);
 
-  const SectionCard({
-    super.key,
-    this.title,
-    required this.child,
-    this.padding = const EdgeInsets.all(16),
-    this.margin = const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+  static _MedDefaults forName(String name) {
+    switch (name) {
+      case 'Methotrexate':
+        return _MedDefaults(name, 'Weekly', 15);
+      case 'Sulfasalazine':
+        return _MedDefaults(name, 'Twice daily', 500);
+      case 'Hydroxychloroquine':
+        return _MedDefaults(name, 'Once daily', 200);
+      case 'Leflunomide':
+        return _MedDefaults(name, 'Once daily', 10);
+      case 'Azathioprine':
+        return _MedDefaults(name, 'Once daily', 50);
+      case 'Ciclosporin':
+        return _MedDefaults(name, 'Twice daily', 100);
+      case 'Mycophenolate':
+        return _MedDefaults(name, 'Twice daily', 500);
+      case 'Adalimumab':
+        return _MedDefaults(name, 'Fortnightly', null);
+      case 'Etanercept':
+        return _MedDefaults(name, 'Weekly', null);
+      case 'Infliximab':
+        return _MedDefaults(name, 'Monthly', null);
+      case 'Tocilizumab':
+        return _MedDefaults(name, 'Monthly', null);
+      case 'Abatacept':
+        return _MedDefaults(name, 'Monthly', null);
+      case 'Certolizumab':
+        return _MedDefaults(name, 'Fortnightly', null);
+      case 'Golimumab':
+        return _MedDefaults(name, 'Monthly', null);
+      case 'Sarilumab':
+        return _MedDefaults(name, 'Fortnightly', null);
+      case 'Ustekinumab':
+        return _MedDefaults(name, 'Monthly', null);
+      case 'Secukinumab':
+        return _MedDefaults(name, 'Monthly', null);
+      case 'Ixekizumab':
+        return _MedDefaults(name, 'Monthly', null);
+      default:
+        return _MedDefaults(name, 'Once daily', null);
+    }
+  }
+}
+
+/// Simple time picker display field.
+class _TimePickerField extends StatelessWidget {
+  final String label;
+  final TimeOfDay? time;
+  final VoidCallback onPick;
+  const _TimePickerField({
+    required this.label,
+    required this.time,
+    required this.onPick,
   });
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: margin,
-      child: Material(
-        color: scheme.surface,
-        elevation: 2,
-        shadowColor: scheme.shadow.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: padding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (title != null) ...[
-                Text(title!, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 8),
-              ],
-              child,
-            ],
-          ),
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onPick,
+      borderRadius: BorderRadius.circular(14),
+      child: Ink(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: cs.surfaceVariant.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.access_time, color: cs.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            Text(
+              time != null ? time!.format(context) : '--:--',
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// Stepper header with animated progress and labels
-class AppStepper extends StatelessWidget {
-  final int current; // 0..2
-  const AppStepper({super.key, required this.current});
+enum DayOfWeek {
+  monday,
+  tuesday,
+  wednesday,
+  thursday,
+  friday,
+  saturday,
+  sunday,
+}
+
+extension DayOfWeekX on DayOfWeek {
+  String get label {
+    switch (this) {
+      case DayOfWeek.monday:
+        return 'Monday';
+      case DayOfWeek.tuesday:
+        return 'Tuesday';
+      case DayOfWeek.wednesday:
+        return 'Wednesday';
+      case DayOfWeek.thursday:
+        return 'Thursday';
+      case DayOfWeek.friday:
+        return 'Friday';
+      case DayOfWeek.saturday:
+        return 'Saturday';
+      case DayOfWeek.sunday:
+        return 'Sunday';
+    }
+  }
+}
+
+// -----------------------------
+// STEP 3: NOTIFICATIONS (mock)
+// -----------------------------
+class _StepNotifications extends GetView<OnboardingController> {
+  const _StepNotifications();
 
   @override
   Widget build(BuildContext context) {
-    final labels = [
-      AppStrings.step1Title,
-      AppStrings.step2Title,
-      AppStrings.step3Title,
-    ];
-    final scheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final headline = Theme.of(
+      context,
+    ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      key: const ValueKey('step3'),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Progress bar
-          SizedBox(
-            height: 6,
-            child: LayoutBuilder(
-              builder: (ctx, cns) {
-                final width = cns.maxWidth;
-                final progress = (current + 1) / 3.0;
-                return Stack(
-                  children: [
-                    Container(
-                      width: width,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceVariant.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      width: width * progress,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [scheme.primary, scheme.primaryContainer],
-                        ),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+          Text(AppStrings.step3Title, style: headline),
+          const SizedBox(height: 4),
+          Text(AppStrings.step3Subtitle),
+          const SizedBox(height: 16),
+          _BenefitCard(icon: Icons.alarm, text: AppStrings.notifBenefit1),
+          const SizedBox(height: 8),
+          _BenefitCard(icon: Icons.event, text: AppStrings.notifBenefit2),
+          const SizedBox(height: 8),
+          _BenefitCard(
+            icon: Icons.favorite_outline,
+            text: AppStrings.notifBenefit3,
           ),
-          const SizedBox(height: 10),
-          // Labels
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(labels.length, (i) {
-              final active = i == current;
-              return AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 180),
-                style: Theme.of(context).textTheme.labelMedium!.copyWith(
-                  color: active ? scheme.primary : scheme.onSurfaceVariant,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                ),
-                child: Text(labels[i]),
+          const Spacer(),
+          Center(
+            child: Obx(() {
+              final enabled = controller.notificationsEnabled.value;
+              return Column(
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    transitionBuilder: (child, anim) => ScaleTransition(
+                      scale: Tween<double>(begin: 0.95, end: 1.0).animate(anim),
+                      child: FadeTransition(opacity: anim, child: child),
+                    ),
+                    child: enabled
+                        ? Row(
+                            key: const ValueKey('enabled_badge'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: cs.primary,
+                                child: const Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                AppStrings.notificationsEnabled,
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () {
+                      controller.notificationsEnabled.value = true;
+                    },
+                    icon: const Icon(Icons.notifications_active_outlined),
+                    label: Text(
+                      enabled
+                          ? AppStrings.enabled
+                          : AppStrings.enableNotifications,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => Get.offAllNamed(Routes.home),
+                    child: const Text(AppStrings.notNow),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               );
             }),
           ),
@@ -622,802 +1942,33 @@ class AppStepper extends StatelessWidget {
   }
 }
 
-// Quick select Chip with scale+fade animation
-class QuickSelectChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const QuickSelectChip({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+class _BenefitCard extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _BenefitCard({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return AnimatedScale(
-      scale: selected ? 1.0 : 0.98,
-      duration: const Duration(milliseconds: 120),
-      child: FilterChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => onTap(),
-        showCheckmark: false,
-        labelStyle: TextStyle(
-          color: selected ? scheme.onPrimary : scheme.onSurface,
-        ),
-        selectedColor: scheme.primary,
-        side: BorderSide(color: scheme.outlineVariant),
-        visualDensity: const VisualDensity(vertical: -2, horizontal: -2),
-      ),
-    );
-  }
-}
-
-// Medication list tile
-class MedicationTile extends StatelessWidget {
-  final MedicationEntry med;
-  final VoidCallback onRemove;
-  const MedicationTile({super.key, required this.med, required this.onRemove});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: scheme.primaryContainer,
-          child: Icon(Icons.medication, color: scheme.onPrimaryContainer),
-        ),
-        title: Text(med.name, style: Theme.of(context).textTheme.titleMedium),
-        subtitle: Text(
-          [
-            if (med.doseMg != null) '${med.doseMg} mg',
-            if (med.notes?.isNotEmpty == true) med.notes!,
-          ].join(' • '),
-        ),
-        trailing: IconButton(
-          tooltip: AppStrings.remove,
-          icon: Icon(Icons.close, color: scheme.error),
-          onPressed: onRemove,
-        ),
-      ),
-    );
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Pages
-////////////////////////////////////////////////////////////////////////////////
-
-class OnboardingShellPage extends GetView<OnboardingController> {
-  const OnboardingShellPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        title: Row(
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
           children: [
-            Hero(
-              tag: 'app_logo',
-              child: CircleAvatar(
-                backgroundColor: scheme.primaryContainer,
-                child: Icon(Icons.favorite, color: scheme.onPrimaryContainer),
-              ),
+            CircleAvatar(
+              backgroundColor: cs.primary.withOpacity(0.15),
+              child: Icon(icon, color: cs.primary),
             ),
             const SizedBox(width: 12),
-            Text(AppStrings.appName),
-          ],
-        ),
-        centerTitle: false,
-      ),
-      body: SafeArea(
-        child: Obx(
-          () => Column(
-            children: [
-              // Stepper
-              AppStepper(current: controller.currentStep.value),
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _headerFor(controller.currentStep.value),
-                    style: textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+            Expanded(
+              child: Text(
+                text,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
-              // Animated step content
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeOutCubic,
-                  transitionBuilder: (child, anim) {
-                    final offsetTween = Tween<Offset>(
-                      begin: const Offset(0.06, 0),
-                      end: Offset.zero,
-                    ).chain(CurveTween(curve: Curves.easeOutCubic));
-                    return FadeTransition(
-                      opacity: anim,
-                      child: SlideTransition(
-                        position: anim.drive(offsetTween),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _buildStep(context, controller.currentStep.value),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Header per step
-  String _headerFor(int step) {
-    switch (step) {
-      case 0:
-        return AppStrings.step1Title;
-      case 1:
-        return AppStrings.step2Title;
-      case 2:
-        return AppStrings.step3Title;
-      default:
-        return '';
-    }
-  }
-
-  // Step pages
-  Widget _buildStep(BuildContext context, int step) {
-    switch (step) {
-      case 0:
-        return const _Step1Profile();
-      case 1:
-        return const _Step2Rheumatologist();
-      case 2:
-        return const _Step3Medications();
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Step 1: Quick Profile Setup
-////////////////////////////////////////////////////////////////////////////////
-
-class _Step1Profile extends GetView<OnboardingController> {
-  const _Step1Profile();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final focusScope = FocusScope.of(context);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        children: [
-          // Name
-          SectionCard(
-            title: 'About you',
-            child: Column(
-              children: [
-                TextField(
-                  decoration: InputDecoration(
-                    labelText: AppStrings.yourName,
-                    border: const OutlineInputBorder(),
-                  ),
-                  textInputAction: TextInputAction.next,
-                  onChanged: (v) =>
-                      controller.name.value = v.trim().isEmpty ? null : v,
-                  onSubmitted: (_) => focusScope.nextFocus(),
-                ),
-                const SizedBox(height: 16),
-                // DOB + Diagnosis
-                Row(
-                  children: [
-                    Expanded(
-                      child: Obx(
-                        () => _DateField(
-                          label: AppStrings.dob,
-                          valueText: controller.dateOfBirth.value != null
-                              ? _fmtDate(controller.dateOfBirth.value!)
-                              : AppStrings.pickDate,
-                          errorText: controller.dateOfBirth.value == null
-                              ? null
-                              : (controller.isDobValid
-                                    ? null
-                                    : AppStrings.dobErrorFuture),
-                          onTap: () async {
-                            final now = DateTime.now();
-                            final first = DateTime(now.year - 110, 1, 1);
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate:
-                                  controller.dateOfBirth.value ??
-                                  DateTime(now.year - 40, now.month, now.day),
-                              firstDate: first,
-                              lastDate: now,
-                              helpText: AppStrings.dob,
-                            );
-                            if (picked != null)
-                              controller.dateOfBirth.value = picked;
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Tooltip(
-                        message: AppStrings.diagnosisHint,
-                        child: Obx(
-                          () => GridView.count(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            children: DiagnosisType.values.map((d) {
-                              final isSel = controller.diagnosis.value == d;
-                              return InkWell(
-                                onTap: () => controller.diagnosis.value = d,
-                                borderRadius: BorderRadius.circular(12),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSel
-                                        ? d.colorHint.withOpacity(0.4)
-                                        : d.colorHint.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isSel
-                                          ? d.colorHint
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.outlineVariant,
-                                      width: isSel ? 2 : 1,
-                                    ),
-                                    boxShadow: isSel
-                                        ? [
-                                            BoxShadow(
-                                              color: d.colorHint.withOpacity(
-                                                0.3,
-                                              ),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                        : [],
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      d.label,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: isSel
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.onPrimary
-                                            : Theme.of(
-                                                context,
-                                              ).colorScheme.onSurfaceVariant,
-                                        fontWeight: isSel
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Obx(() {
-                  if (controller.step1Valid) return const SizedBox.shrink();
-                  return Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      !controller.isDobValid
-                          ? (controller.dateOfBirth.value == null
-                                ? AppStrings.dobRequired
-                                : AppStrings.dobErrorFuture)
-                          : (!controller.isDiagnosisValid
-                                ? AppStrings.diagnosisRequired
-                                : ''),
-                      style: TextStyle(color: scheme.error),
-                    ),
-                  );
-                }),
-              ],
             ),
-          ),
-          // Nav
-          _NavBar(
-            onBack: null,
-            backEnabled: false,
-            onNext: controller.step1Valid ? controller.goNext : null,
-            nextLabel: AppStrings.next,
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _fmtDate(DateTime d) =>
-      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-}
-
-// DOB field (button-like)
-class _DateField extends StatelessWidget {
-  final String label;
-  final String valueText;
-  final String? errorText;
-  final VoidCallback onTap;
-
-  const _DateField({
-    required this.label,
-    required this.valueText,
-    required this.onTap,
-    this.errorText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label),
-        const SizedBox(height: 6),
-        InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Ink(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.event, color: scheme.primary),
-                const SizedBox(width: 8),
-                Text(valueText),
-              ],
-            ),
-          ),
-        ),
-        if (errorText != null && errorText!.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(errorText!, style: TextStyle(color: scheme.error)),
-        ],
-      ],
-    );
-  }
-}
-
-// Diagnosis picker with colorful chips/cards
-class _DiagnosisPicker extends StatelessWidget {
-  final DiagnosisType? selected;
-  final ValueChanged<DiagnosisType> onSelect;
-
-  const _DiagnosisPicker({required this.selected, required this.onSelect});
-
-  @override
-  Widget build(BuildContext context) {
-    final items = DiagnosisType.values;
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(AppStrings.diagnosis),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: items.map((d) {
-            final isSel = selected == d;
-            return InkWell(
-              onTap: () => onSelect(d),
-              borderRadius: BorderRadius.circular(12),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: isSel
-                      ? d.colorHint.withOpacity(0.4)
-                      : d.colorHint.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSel ? d.colorHint : scheme.outlineVariant,
-                    width: isSel ? 2 : 1,
-                  ),
-                  boxShadow: isSel
-                      ? [
-                          BoxShadow(
-                            color: d.colorHint.withOpacity(0.3),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: Text(
-                  d.label,
-                  style: TextStyle(
-                    color: isSel ? scheme.onPrimary : scheme.onSurfaceVariant,
-                    fontWeight: isSel ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Step 2: Your Rheumatologist
-////////////////////////////////////////////////////////////////////////////////
-
-class _Step2Rheumatologist extends GetView<OnboardingController> {
-  const _Step2Rheumatologist();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final focusScope = FocusScope.of(context);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        children: [
-          SectionCard(
-            title: 'Care team',
-            child: Column(
-              children: [
-                TextField(
-                  decoration: InputDecoration(
-                    labelText: AppStrings.doctorName,
-                    border: const OutlineInputBorder(),
-                  ),
-                  textInputAction: TextInputAction.next,
-                  onChanged: (v) =>
-                      controller.doctorName.value = v.trim().isEmpty ? null : v,
-                  onSubmitted: (_) => focusScope.nextFocus(),
-                ),
-                const SizedBox(height: 12),
-                Obx(
-                  () => TextField(
-                    decoration: InputDecoration(
-                      labelText: AppStrings.hospitalName,
-                      border: const OutlineInputBorder(),
-                      errorText:
-                          controller.step2CanNext ||
-                              controller.hospitalName.value == null
-                          ? null
-                          : AppStrings.hospitalRequired,
-                    ),
-                    textInputAction: TextInputAction.next,
-                    onChanged: (v) => controller.hospitalName.value =
-                        v.trim().isEmpty ? null : v,
-                    onSubmitted: (_) => focusScope.nextFocus(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  decoration: InputDecoration(
-                    labelText: AppStrings.clinicHelpline,
-                    border: const OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.next,
-                  onChanged: (v) => controller.clinicHelpline.value =
-                      v.trim().isEmpty ? null : v,
-                  onSubmitted: (_) => focusScope.nextFocus(),
-                ),
-                const SizedBox(height: 12),
-                Obx(
-                  () => _DateField(
-                    label: AppStrings.nextAppointment,
-                    valueText: controller.nextAppointment.value != null
-                        ? _fmtDate(controller.nextAppointment.value!)
-                        : AppStrings.nextAppointmentHint,
-                    onTap: () async {
-                      final now = DateTime.now();
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: controller.nextAppointment.value ?? now,
-                        firstDate: DateTime(now.year, now.month, now.day),
-                        lastDate: DateTime(now.year + 5),
-                        helpText: AppStrings.nextAppointment,
-                      );
-                      if (picked != null)
-                        controller.nextAppointment.value = picked;
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    AppStrings.youCanSkip,
-                    style: TextStyle(color: scheme.onSurfaceVariant),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _NavBar(
-            onBack: controller.goBack,
-            backEnabled: true,
-            onNext: controller.step2CanNext ? controller.goNext : null,
-            onSkip: controller.step2CanSkip ? controller.skipStep : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _fmtDate(DateTime d) =>
-      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Step 3: Current Medications
-////////////////////////////////////////////////////////////////////////////////
-
-class _Step3Medications extends GetView<OnboardingController> {
-  const _Step3Medications();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Stack(
-      children: [
-        SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 96),
-          child: Column(
-            children: [
-              SectionCard(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.info_outline, color: scheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        AppStrings.medicationsHeader,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Medications list
-              Obx(() {
-                final items = controller.medications;
-                if (items.isEmpty) {
-                  return _EmptyStateCard(
-                    icon: Icons.medication_liquid,
-                    title: AppStrings.noMeds,
-                  );
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: items
-                      .map(
-                        (m) => AnimatedOpacity(
-                          key: ValueKey(m.name),
-                          duration: const Duration(milliseconds: 180),
-                          opacity: 1.0,
-                          child: MedicationTile(
-                            med: m,
-                            onRemove: () =>
-                                controller.removeMedicationByName(m.name),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                );
-              }),
-              const SizedBox(height: 8),
-              // Prednisolone toggle + dose
-              SectionCard(
-                title: AppStrings.prednisolone,
-                child: Obx(
-                  () => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SwitchListTile.adaptive(
-                        title: const Text(AppStrings.prednisolone),
-                        value: controller.prednisoloneOn.value,
-                        onChanged: (v) {
-                          controller.prednisoloneOn.value = v;
-                          if (!v) controller.prednisoloneDoseMg.value = null;
-                        },
-                      ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: controller.prednisoloneOn.value
-                            ? Column(
-                                key: const ValueKey('pred_on'),
-                                children: [
-                                  TextField(
-                                    decoration: InputDecoration(
-                                      labelText: AppStrings.predDoseMg,
-                                      helperText: AppStrings.doseHelper,
-                                      errorText: controller.predDoseValid
-                                          ? null
-                                          : AppStrings.predDoseInvalid,
-                                      border: const OutlineInputBorder(),
-                                    ),
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    onChanged: (v) {
-                                      final parsed = double.tryParse(v);
-                                      controller.prednisoloneDoseMg.value =
-                                          parsed;
-                                    },
-                                  ),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Pain relief chips
-              SectionCard(
-                title: AppStrings.painRelief,
-                child: Obx(
-                  () => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: controller.painReliefOptions.map((o) {
-                          final selected = controller.painRelief.contains(o);
-                          return QuickSelectChip(
-                            label: o,
-                            selected: selected,
-                            onTap: () => controller.togglePainRelief(o),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 12),
-                      _OtherPainReliefField(),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _NavBar(
-                onBack: controller.goBack,
-                backEnabled: true,
-                onNext: controller.step3Valid ? controller.goNext : null,
-                onSkip: controller.skipStep,
-              ),
-              const SizedBox(height: 80),
-            ],
-          ),
-        ),
-        // FAB to add medications
-        Positioned(
-          bottom: 16 + MediaQuery.of(context).viewPadding.bottom,
-          right: 16,
-          child: SizedBox(
-            width: 200, // Set a finite width to avoid infinite constraints
-            child: FloatingActionButton.extended(
-              heroTag: 'add_med',
-              onPressed: () => _openAddMedicationSheet(context),
-              icon: const Icon(Icons.add),
-              label: const Text(AppStrings.addMedication),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _openAddMedicationSheet(BuildContext context) {
-    final controller = Get.find<OnboardingController>();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => _AddMedicationSheet(
-        quick: controller.quickMeds,
-        dmards: controller.dmardsList,
-        biologics: controller.biologicsList,
-        onPick: (name) => _openDoseConfigSheet(context, name),
-      ),
-    );
-  }
-
-  void _openDoseConfigSheet(BuildContext context, String medName) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => _MedicationDoseSheet(medName: medName),
-    );
-  }
-}
-
-// Empty state card
-class _EmptyStateCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  const _EmptyStateCard({required this.icon, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return SectionCard(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 28.0),
-        child: Column(
-          children: [
-            Icon(icon, size: 48, color: scheme.primary),
-            const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
           ],
         ),
       ),
@@ -1425,564 +1976,44 @@ class _EmptyStateCard extends StatelessWidget {
   }
 }
 
-// Bottom sheet: Add Medication (search + quick chips + lists)
-class _AddMedicationSheet extends StatefulWidget {
-  final List<String> quick;
-  final List<String> dmards;
-  final List<String> biologics;
-  final ValueChanged<String> onPick;
-
-  const _AddMedicationSheet({
-    required this.quick,
-    required this.dmards,
-    required this.biologics,
-    required this.onPick,
-  });
-
-  @override
-  State<_AddMedicationSheet> createState() => _AddMedicationSheetState();
-}
-
-class _AddMedicationSheetState extends State<_AddMedicationSheet> {
-  String query = '';
+// -----------------------------
+// Placeholder Home route
+// -----------------------------
+class OnboardingCompletePlaceholder extends StatelessWidget {
+  const OnboardingCompletePlaceholder({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    List<String> filter(List<String> list) {
-      if (query.trim().isEmpty) return list;
-      final q = query.toLowerCase();
-      return list.where((e) => e.toLowerCase().contains(q)).toList();
-    }
-
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.8,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) {
-        return SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: scheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                decoration: InputDecoration(
-                  hintText: '${AppStrings.search} medications',
-                  prefixIcon: const Icon(Icons.search),
-                  border: const OutlineInputBorder(),
-                ),
-                onChanged: (v) => setState(() => query = v),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                AppStrings.quickSelect,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: filter(widget.quick).map((m) {
-                  return ActionChip(
-                    label: Text(m),
-                    onPressed: () => widget.onPick(m),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              _MedGroup(
-                title: AppStrings.dmards,
-                meds: filter(widget.dmards),
-                onPick: widget.onPick,
-              ),
-              const SizedBox(height: 8),
-              _MedGroup(
-                title: AppStrings.biologics,
-                meds: filter(widget.biologics),
-                onPick: widget.onPick,
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(AppStrings.cancel),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MedGroup extends StatelessWidget {
-  final String title;
-  final List<String> meds;
-  final ValueChanged<String> onPick;
-  const _MedGroup({
-    required this.title,
-    required this.meds,
-    required this.onPick,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ExpansionTile(
-      title: Text(title),
-      initiallyExpanded: true,
-      children: meds
-          .map((m) => ListTile(title: Text(m), onTap: () => onPick(m)))
-          .toList(),
-    );
-  }
-}
-
-// Dose/Frequency configuration sheet (simple, guideline-informed hints)
-enum _Frequency { onceDaily, twiceDaily, tds, weekly, fortnightly, monthly }
-
-extension _FrequencyX on _Frequency {
-  String get label {
-    switch (this) {
-      case _Frequency.onceDaily:
-        return 'Once daily';
-      case _Frequency.twiceDaily:
-        return 'Twice daily';
-      case _Frequency.tds:
-        return 'TDS (three times daily)';
-      case _Frequency.weekly:
-        return 'Weekly';
-      case _Frequency.fortnightly:
-        return 'Every 2 weeks';
-      case _Frequency.monthly:
-        return 'Monthly';
-    }
-  }
-}
-
-class _MedicationDoseSheet extends StatefulWidget {
-  final String medName;
-  const _MedicationDoseSheet({required this.medName});
-
-  @override
-  State<_MedicationDoseSheet> createState() => _MedicationDoseSheetState();
-}
-
-class _MedicationDoseSheetState extends State<_MedicationDoseSheet> {
-  _Frequency? freq;
-  double? doseMg;
-  DateTime? startDate;
-  final notesCtrl = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    // Guideline-inspired defaults
-    final n = widget.medName.toLowerCase();
-    if (n.contains('methotrexate')) {
-      freq = _Frequency.weekly;
-      notesCtrl.text = 'Default: once weekly (adjust as advised)';
-    } else if (n.contains('sulfasalazine')) {
-      freq = _Frequency.twiceDaily;
-      notesCtrl.text =
-          'Guide: titrate over weeks (e.g., 500 mg daily in week 1, then increase) – adjust per clinician advice';
-    } else if (n.contains('hydroxychloroquine')) {
-      freq = _Frequency.onceDaily;
-      notesCtrl.text =
-          'Typical: 200–400 mg daily (max per weight) – adjust as advised';
-    } else if (n.contains('adalimumab') ||
-        n.contains('etanercept') ||
-        n.contains('infliximab') ||
-        n.contains('biologic')) {
-      freq = _Frequency.fortnightly; // common for some biologics
-      notesCtrl.text =
-          'Typical biologic schedule – adjust per product guidance';
-    }
-  }
-
-  @override
-  void dispose() {
-    notesCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = Get.find<OnboardingController>();
-    final scheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 44,
-            height: 5,
-            decoration: BoxDecoration(
-              color: scheme.outlineVariant,
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(widget.medName, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          // Frequency selector
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              AppStrings.frequency,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _Frequency.values.map((f) {
-              final selected = freq == f;
-              return ChoiceChip(
-                label: Text(f.label),
-                selected: selected,
-                onSelected: (_) => setState(() => freq = f),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 12),
-          // Dose (optional)
-          TextField(
-            decoration: const InputDecoration(
-              labelText: 'Dose (mg, optional)',
-              border: OutlineInputBorder(),
-            ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onChanged: (v) => setState(() => doseMg = double.tryParse(v)),
-          ),
-          const SizedBox(height: 12),
-          // Start date
-          _DateField(
-            label: AppStrings.startDate,
-            valueText: startDate != null
-                ? _fmtDate(startDate!)
-                : AppStrings.pickDate,
-            onTap: () async {
-              final now = DateTime.now();
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: startDate ?? now,
-                firstDate: DateTime(now.year - 1),
-                lastDate: DateTime(now.year + 3),
-                helpText: AppStrings.startDate,
-              );
-              if (picked != null) setState(() => startDate = picked);
-            },
-          ),
-          const SizedBox(height: 12),
-          // Notes
-          TextField(
-            controller: notesCtrl,
-            minLines: 2,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              labelText: AppStrings.notes,
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Save
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(AppStrings.cancel),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    final freqText = freq?.label;
-                    final combinedNotes = [
-                      if (freqText != null) freqText,
-                      if (startDate != null) 'Start: ${_fmtDate(startDate!)}',
-                      if (notesCtrl.text.trim().isNotEmpty)
-                        notesCtrl.text.trim(),
-                    ].join(' • ');
-                    controller.addOrUpdateMedication(
-                      MedicationEntry(
-                        name: widget.medName,
-                        doseMg: doseMg,
-                        notes: combinedNotes.isEmpty ? null : combinedNotes,
-                      ),
-                    );
-                    controller.persist();
-                    Navigator.of(context).pop(); // close dose sheet
-                    Navigator.of(context).pop(); // close add sheet
-                  },
-                  child: Text(AppStrings.save),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  static String _fmtDate(DateTime d) =>
-      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-}
-
-// Other pain relief entry (free text that adds as chip)
-class _OtherPainReliefField extends StatefulWidget {
-  @override
-  State<_OtherPainReliefField> createState() => _OtherPainReliefFieldState();
-}
-
-class _OtherPainReliefFieldState extends State<_OtherPainReliefField> {
-  final ctrl = TextEditingController();
-
-  @override
-  void dispose() {
-    ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = Get.find<OnboardingController>();
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: ctrl,
-            decoration: const InputDecoration(
-              labelText: AppStrings.painReliefOther,
-              border: OutlineInputBorder(),
-            ),
-            onSubmitted: (_) => _add(controller),
-          ),
-        ),
-        const SizedBox(width: 8),
-        ElevatedButton(
-          onPressed: () => _add(controller),
-          child: const Text(AppStrings.add),
-        ),
-      ],
-    );
-  }
-
-  void _add(OnboardingController c) {
-    final text = ctrl.text.trim();
-    if (text.isEmpty) return;
-    c.togglePainRelief(text); // add or remove
-    ctrl.clear();
-    c.persist();
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Notifications Setup (Final screen)
-////////////////////////////////////////////////////////////////////////////////
-
-class NotificationsSetupPage extends GetView<OnboardingController> {
-  const NotificationsSetupPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.notificationsTitle)),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              SectionCard(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.notifications_active,
-                      size: 36,
-                      color: scheme.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppStrings.notificationsHeader,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(AppStrings.notificationsBody1),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Obx(
-                () => AnimatedOpacity(
-                  opacity: controller.notificationsEnabled.value ? 1 : 1,
-                  duration: const Duration(milliseconds: 180),
-                  child: Column(
-                    children: [
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.check_circle),
-                        label: const Text(AppStrings.enableNotifications),
-                        onPressed: () async {
-                          controller.notificationsEnabled.value = true;
-                          await controller.persist();
-                          Get.snackbar(
-                            AppStrings.notificationsEnabled,
-                            AppStrings.notificationsSaved,
-                            snackPosition: SnackPosition.BOTTOM,
-                          );
-                          await Future.delayed(
-                            const Duration(milliseconds: 120),
-                          );
-                          Get.offAllNamed(OnboardingRoutes.home);
-                        },
-                        // Use finite min width and desired height to avoid infinite constraints.
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: () async {
-                          controller.notificationsEnabled.value = false;
-                          await controller.persist();
-                          Get.offAllNamed(OnboardingRoutes.home);
-                        },
-                        child: const Text(AppStrings.notNowNotifications),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// NavBar (Back/Skip/Next)
-////////////////////////////////////////////////////////////////////////////////
-
-class _NavBar extends StatelessWidget {
-  final VoidCallback? onBack;
-  final bool backEnabled;
-  final VoidCallback? onNext;
-  final VoidCallback? onSkip;
-  final String nextLabel;
-
-  const _NavBar({
-    required this.onBack,
-    required this.backEnabled,
-    required this.onNext,
-    this.onSkip,
-    this.nextLabel = AppStrings.next,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600), // Set a finite width
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          child: Row(
-            children: [
-              // Back
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: backEnabled ? onBack : null,
-                  child: const Text(AppStrings.back),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Skip (if available)
-              if (onSkip != null) ...[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onSkip,
-                    child: const Text(AppStrings.skip),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              // Next
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: onNext,
-                  child: Text(nextLabel),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Home (placeholder)
-////////////////////////////////////////////////////////////////////////////////
-
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.homeTitle)),
+      appBar: AppBar(title: const Text(AppStrings.appName)),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Hero(
-              tag: 'app_logo',
-              child: CircleAvatar(
-                radius: 28,
-                backgroundColor: scheme.primaryContainer,
-                child: Icon(Icons.favorite, color: scheme.onPrimaryContainer),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Card(
+            elevation: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, size: 64, color: cs.primary),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Onboarding complete!',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'You can now start using MyRheumLog.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(AppStrings.homeHello),
-            const SizedBox(height: 8),
-            Text(
-              'This is a placeholder Home screen.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+          ),
         ),
       ),
     );

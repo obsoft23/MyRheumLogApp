@@ -4,7 +4,10 @@ import 'package:get_storage/get_storage.dart';
 import 'package:myrheumlogapp/view/onboarding/user_dob.dart';
 
 class PickUsernameScreen extends StatefulWidget {
+  const PickUsernameScreen({super.key});
+
   @override
+  // ignore: library_private_types_in_public_api
   _PickUsernameScreenState createState() => _PickUsernameScreenState();
 }
 

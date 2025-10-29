@@ -1,6 +1,9 @@
 // ignore_for_file: unused_field, library_private_types_in_public_api, deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:myrheumlogapp/view/onboarding/onboard.dart';
 import 'package:myrheumlogapp/view/themes/app_theme.dart';
 
 class UserDobPage extends StatefulWidget {
@@ -58,6 +61,10 @@ class _UserDobPageState extends State<UserDobPage>
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
+        GetStorage().write('dob', _selectedDate!.toIso8601String());
+        // 
+        //
+        Get.offAll(const OnboardingShell());
       });
     }
   }

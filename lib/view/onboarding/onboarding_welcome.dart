@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'package:flutter/foundation.dart';
 import 'package:myrheumlogapp/view/onboarding/pick_usersname.dart';
 
 class OnboardingFirstPage extends StatelessWidget {
@@ -50,9 +51,11 @@ class OnboardingFirstPage extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () {
                     // Navigate to the next page
-                    print(
+                    if (kDebugMode) {
+                      print(
                       "Navigating to the next onboarding page: Your Rheumatologist",
                     );
+                    }
                     Get.offAll(() => PickUsernameScreen());
                   },
                   style: ElevatedButton.styleFrom(
